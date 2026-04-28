@@ -407,12 +407,13 @@ Noto/
 │   └── supabase/
 │       ├── migrations/0001_init.sql     # 表 + pgvector + 索引
 │       └── README.md
-├── doc/
-│   └── deep-research-report.md
 ├── image/
 │   └── logo.png
-└── docs/superpowers/specs/
-    └── 2026-04-27-noto-design.md
+└── docs/
+    ├── deep-research-report.md
+    └── superpowers/
+        ├── specs/2026-04-27-noto-design.md
+        └── plans/2026-04-27-noto-v1.md
 ```
 
 ---
