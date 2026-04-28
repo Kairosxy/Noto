@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Document, Notebook, notebooksApi } from "../api/client";
 import ChatView from "../components/ChatView";
+import ReportView from "../components/ReportView";
 import UploadZone from "../components/UploadZone";
 
 type Tab = "docs" | "chat" | "review" | "report";
@@ -62,7 +63,7 @@ export default function NotebookDetail() {
           </Link>
         </div>
       )}
-      {tab === "report" && <div className="card">报告页（Task 21）</div>}
+      {tab === "report" && <ReportView notebookId={id} />}
     </div>
   );
 }

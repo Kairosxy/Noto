@@ -135,3 +135,15 @@ export const chatApiExt = {
       { method: "POST", body: JSON.stringify({ conversation_id }) },
     ),
 };
+
+export type Report = {
+  id: string; notebook_id: string;
+  from_date: string; to_date: string;
+  content: string; generated_at: string;
+};
+
+export const reportApi = {
+  list: (notebookId: string) => req<Report[]>(`/api/report?notebook_id=${notebookId}`),
+  generate: (body: { notebook_id: string; from_date: string; to_date: string }) =>
+    req<Report>("/api/report/generate", { method: "POST", body: JSON.stringify(body) }),
+};
