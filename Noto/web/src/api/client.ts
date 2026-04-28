@@ -72,3 +72,43 @@ export async function streamSSE(
   }
   return full;
 }
+
+export type Notebook = { id: string; title: string; goal: string; created_at: string };
+export type Document = {
+  id: string; notebook_id: string; filename: string;
+  mime: string | null; pages: number | null;
+  status: "parsing" | "ready" | "failed"; created_at: string;
+};
+export type Message = {
+  id: string; conversation_id: string;
+  role: "user" | "assistant"; content: string;
+  citations: { chunk_id: string; page_num: number | null }[] | null;
+  created_at: string;
+};
+export type Conversation = {
+  id: string; notebook_id: string; title: string;
+  status: "active" | "closed"; started_at: string; closed_at: string | null;
+};
+
+export const notebooksApi = {
+  list: () => req<Notebook[]>("/api/notebooks"),
+  create: (body: { title: string; goal: string }) =>
+    req<Notebook>("/api/notebooks", { method: "POST", body: JSON.stringify(body) }),
+  get: (id: string) => req<Notebook>(`/api/notebooks/${id}`),
+  listDocuments: (id: string) => req<Document[]>(`/api/notebooks/${id}/documents`),
+};
+
+export const chatApi = {
+  listConversations: (notebookId: string) =>
+    req<Conversation[]>(`/api/chat/conversations?notebook_id=${notebookId}`),
+  listMessages: (convId: string) => req<Message[]>(`/api/chat/messages?conversation_id=${convId}`),
+};
+
+export async function uploadDocument(notebookId: string, file: File): Promise<{ document_id: string; status: string }> {
+  const fd = new FormData();
+  fd.append("notebook_id", notebookId);
+  fd.append("file", file);
+  const resp = await fetch("/api/ingest/upload", { method: "POST", body: fd });
+  if (!resp.ok) throw new Error(await resp.text());
+  return resp.json();
+}
