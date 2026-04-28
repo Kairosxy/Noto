@@ -70,4 +70,5 @@ async def update_settings(req: SettingsUpdateRequest, request: Request):
     new_cfg = load_config()
     request.app.state.config = new_cfg
     request.app.state.ai_manager.refresh(new_cfg)
+    request.app.state.supabase.refresh(new_cfg)
     return new_cfg.get_safe_settings()
