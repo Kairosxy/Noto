@@ -3,6 +3,11 @@
 Anthropic 官方无 embedding API；Google 需要时再加分支。"""
 
 
+# Qwen text-embedding-v3 limits batch to 10; others usually allow more.
+# 10 is safe universally.
+_BATCH_SIZE = 10
+
+
 def _get_openai_client(api_key: str, base_url: str):
     from openai import AsyncOpenAI
     kwargs = {"api_key": api_key}
@@ -24,10 +29,12 @@ async def embed(
         return []
 
     if provider in ("openai", "anthropic", "google"):
-        # anthropic/google 也走 openai-compatible 的 /v1/embeddings 端点（用户需自备兼容端点）
-        # 默认 openai 分支
         client = _get_openai_client(api_key, base_url)
-        resp = await client.embeddings.create(model=model, input=texts)
-        return [d.embedding for d in resp.data]
+        vectors: list[list[float]] = []
+        for i in range(0, len(texts), _BATCH_SIZE):
+            batch = texts[i:i + _BATCH_SIZE]
+            resp = await client.embeddings.create(model=model, input=batch)
+            vectors.extend(d.embedding for d in resp.data)
+        return vectors
 
     raise ValueError(f"不支持的 embedding provider: {provider}")
