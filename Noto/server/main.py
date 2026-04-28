@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import load_config
 from routers import ai as ai_router
 from services.ai.manager import AIProviderManager
+from services.supabase_client import SupabaseClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -29,6 +30,7 @@ def create_app() -> FastAPI:
     cfg = load_config()
     app.state.config = cfg
     app.state.ai_manager = AIProviderManager(cfg)
+    app.state.supabase = SupabaseClient(cfg)
 
     @app.get("/api/health")
     def health():
