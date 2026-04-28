@@ -2,14 +2,15 @@
 
 import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from models.schemas import ChatSendRequest
+from models.schemas import ChatSendRequest, CloseConversationRequest
 from services.ai.embedding import embed
-from services.ai.utils import SSE_DONE, SSE_HEADERS, sse_event
+from services.ai.utils import SSE_DONE, SSE_HEADERS, extract_json, sse_event
 from services.retrieval import search
 
 log = logging.getLogger("noto.chat")
@@ -113,3 +114,47 @@ async def list_conversations(notebook_id: str, request: Request):
     supa = request.app.state.supabase.client
     r = supa.table("conversations").select("*").eq("notebook_id", notebook_id).order("started_at", desc=True).execute()
     return r.data or []
+
+
+_CARD_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "card_extraction.md"
+
+
+@router.post("/close-conversation")
+async def close_conversation(req: CloseConversationRequest, request: Request):
+    supa = request.app.state.supabase.client
+    mgr = request.app.state.ai_manager
+
+    conv = supa.table("conversations").select("notebook_id,status").eq("id", req.conversation_id).single().execute()
+    if not conv.data:
+        raise HTTPException(404, "对话不存在")
+    if conv.data["status"] == "closed":
+        return {"ok": True, "cards": []}
+
+    msgs = supa.table("messages").select("role,content").eq("conversation_id", req.conversation_id).order("created_at").execute()
+    transcript = "\n\n".join(f"{m['role']}: {m['content']}" for m in (msgs.data or []))
+
+    prompt = _CARD_PROMPT_PATH.read_text(encoding="utf-8").replace("{transcript}", transcript)
+    raw = await mgr.chat([{"role": "user", "content": prompt}])
+    parsed = extract_json(raw)
+    if not isinstance(parsed, list):
+        raise HTTPException(500, f"卡片提炼失败，原始回复：{raw[:200]}")
+
+    rows = []
+    for item in parsed:
+        if not isinstance(item, dict) or "question" not in item or "answer" not in item:
+            continue
+        rows.append({
+            "notebook_id": conv.data["notebook_id"],
+            "source_conversation_id": req.conversation_id,
+            "question": item["question"],
+            "answer": item["answer"],
+        })
+    if rows:
+        supa.table("cards").insert(rows).execute()
+
+    supa.table("conversations").update({
+        "status": "closed",
+        "closed_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", req.conversation_id).execute()
+
+    return {"ok": True, "cards": rows}
