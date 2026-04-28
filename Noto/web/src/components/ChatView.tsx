@@ -1,0 +1,85 @@
+import { FormEvent, useEffect, useState } from "react";
+import { chatApi, Message, streamSSE } from "../api/client";
+import CitationPanel from "./CitationPanel";
+
+export default function ChatView({ notebookId }: { notebookId: string }) {
+  const [convId, setConvId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [streaming, setStreaming] = useState("");
+  const [input, setInput] = useState("");
+  const [citations, setCitations] = useState<{ chunk_id: string; page_num: number | null }[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!convId) return;
+    chatApi.listMessages(convId).then(setMessages);
+  }, [convId]);
+
+  const onSend = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || busy) return;
+    const userMsg = input;
+    setInput("");
+    setBusy(true);
+    setStreaming("");
+
+    // 乐观追加用户消息
+    setMessages((m) => [...m, {
+      id: "tmp-" + Date.now(),
+      conversation_id: convId ?? "",
+      role: "user",
+      content: userMsg,
+      citations: null,
+      created_at: new Date().toISOString(),
+    }]);
+
+    let newConvId = convId;
+    await streamSSE(
+      "/api/chat/send",
+      { notebook_id: notebookId, conversation_id: convId, message: userMsg },
+      (d) => {
+        if ((d as any).conversation_id && !convId) {
+          newConvId = (d as any).conversation_id;
+          setConvId(newConvId);
+        }
+        if ((d as any).citations) setCitations((d as any).citations);
+        if (d.content) setStreaming((s) => s + d.content);
+        if (d.error) setStreaming((s) => s + `\n[ERROR] ${d.error}`);
+      },
+    );
+
+    // 完成后重新拉消息
+    if (newConvId) setMessages(await chatApi.listMessages(newConvId));
+    setStreaming("");
+    setBusy(false);
+  };
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
+      <div>
+        <div className="card" style={{ minHeight: 300 }}>
+          {messages.length === 0 && !streaming && <p style={{ color: "#888" }}>发一条消息开始学习。</p>}
+          {messages.map((m) => (
+            <div key={m.id} style={{ marginBottom: 12 }}>
+              <strong>{m.role === "user" ? "你" : "Noto"}：</strong>
+              <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div>
+            </div>
+          ))}
+          {streaming && (
+            <div style={{ marginBottom: 12 }}>
+              <strong>Noto：</strong>
+              <div style={{ whiteSpace: "pre-wrap" }}>{streaming}</div>
+            </div>
+          )}
+        </div>
+        <form onSubmit={onSend}>
+          <input value={input} disabled={busy} onChange={(e) => setInput(e.target.value)} placeholder="说说你的理解..." />
+          <button className="primary" type="submit" disabled={busy} style={{ marginTop: 8 }}>
+            {busy ? "回答中..." : "发送"}
+          </button>
+        </form>
+      </div>
+      <CitationPanel citations={citations} />
+    </div>
+  );
+}

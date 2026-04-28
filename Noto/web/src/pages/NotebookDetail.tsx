@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Document, Notebook, notebooksApi } from "../api/client";
+import ChatView from "../components/ChatView";
 import UploadZone from "../components/UploadZone";
 
 type Tab = "docs" | "chat" | "review" | "report";
@@ -53,7 +54,7 @@ export default function NotebookDetail() {
           ))}
         </div>
       )}
-      {tab === "chat" && <div className="card">对话页（Task 16）</div>}
+      {tab === "chat" && <ChatView notebookId={id} />}
       {tab === "review" && <div className="card">复习页（Task 20）</div>}
       {tab === "report" && <div className="card">报告页（Task 21）</div>}
     </div>
