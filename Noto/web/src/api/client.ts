@@ -112,3 +112,26 @@ export async function uploadDocument(notebookId: string, file: File): Promise<{ 
   if (!resp.ok) throw new Error(await resp.text());
   return resp.json();
 }
+
+export type Card = {
+  id: string; notebook_id: string;
+  question: string; answer: string;
+  due_at: string; ease: number; reps: number;
+};
+
+export const reviewApi = {
+  due: (notebookId: string) => req<Card[]>(`/api/review/due?notebook_id=${notebookId}`),
+  rate: (body: { card_id: string; rating: "again" | "hard" | "good" | "easy" }) =>
+    req<{ due_at: string; ease: number; reps: number }>("/api/review/rate", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+};
+
+export const chatApiExt = {
+  close: (conversation_id: string) =>
+    req<{ ok: boolean; cards: { question: string; answer: string }[] }>(
+      "/api/chat/close-conversation",
+      { method: "POST", body: JSON.stringify({ conversation_id }) },
+    ),
+};

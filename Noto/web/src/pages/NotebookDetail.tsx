@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { Document, Notebook, notebooksApi } from "../api/client";
 import ChatView from "../components/ChatView";
 import UploadZone from "../components/UploadZone";
@@ -55,7 +55,13 @@ export default function NotebookDetail() {
         </div>
       )}
       {tab === "chat" && <ChatView notebookId={id} />}
-      {tab === "review" && <div className="card">复习页（Task 20）</div>}
+      {tab === "review" && (
+        <div className="card">
+          <Link to={`/notebooks/${id}/review`}>
+            <button className="primary">开始复习到期卡</button>
+          </Link>
+        </div>
+      )}
       {tab === "report" && <div className="card">报告页（Task 21）</div>}
     </div>
   );
