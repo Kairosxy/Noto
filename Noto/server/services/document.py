@@ -19,12 +19,17 @@ class Chunk:
     position: int
 
 
+def _sanitize(s: str) -> str:
+    # Postgres text 拒绝 NUL；某些 PDF 解析器会漏 NUL 字节
+    return s.replace("\x00", "")
+
+
 def parse(path: Path | str) -> ParsedDoc:
     p = Path(path)
     ext = p.suffix.lower()
 
     if ext == ".txt" or ext == ".md":
-        text = p.read_text(encoding="utf-8")
+        text = _sanitize(p.read_text(encoding="utf-8"))
         return ParsedDoc(text=text, pages=1, page_map=[{"start": 0, "end": len(text), "page": 1}])
 
     if ext == ".pdf":
@@ -34,7 +39,7 @@ def parse(path: Path | str) -> ParsedDoc:
         page_map = []
         cursor = 0
         for i, page in enumerate(reader.pages, start=1):
-            page_text = page.extract_text() or ""
+            page_text = _sanitize(page.extract_text() or "")
             if cursor > 0:
                 parts.append("\n\n")
                 cursor += 2
@@ -46,7 +51,7 @@ def parse(path: Path | str) -> ParsedDoc:
     if ext == ".docx":
         from docx import Document
         doc = Document(str(p))
-        text = "\n\n".join(pa.text for pa in doc.paragraphs if pa.text.strip())
+        text = _sanitize("\n\n".join(pa.text for pa in doc.paragraphs if pa.text.strip()))
         return ParsedDoc(text=text, pages=1, page_map=[{"start": 0, "end": len(text), "page": 1}])
 
     raise ValueError(f"不支持的文件类型: {ext}")
