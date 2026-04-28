@@ -12,10 +12,10 @@ export type SafeSettings = {
 };
 
 async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const resp = await fetch(path, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init.headers || {}) },
-  });
+  const isForm = init.body instanceof FormData;
+  const headers: Record<string, string> = { ...(init.headers as Record<string, string> | undefined) };
+  if (!isForm) headers["Content-Type"] = "application/json";
+  const resp = await fetch(path, { ...init, headers });
   if (!resp.ok) {
     const detail = await resp.text();
     throw new Error(`${resp.status}: ${detail}`);
@@ -34,16 +34,25 @@ export const api = {
     }),
 };
 
-/** 消费 SSE 流；onChunk 收到 {content|error} 逐片；resolved 时返回完整文本 */
+export type StreamChunk = {
+  conversation_id?: string;
+  citations?: { chunk_id: string; page_num: number | null }[];
+  content?: string;
+  error?: string;
+};
+
+/** 消费 SSE 流；onChunk 收到逐片对象；resolved 时返回完整文本。传 signal 可中途取消。 */
 export async function streamSSE(
   path: string,
   body: unknown,
-  onChunk: (data: { content?: string; error?: string }) => void,
+  onChunk: (data: StreamChunk) => void,
+  signal?: AbortSignal,
 ): Promise<string> {
   const resp = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   });
   if (!resp.ok || !resp.body) throw new Error(`SSE failed: ${resp.status}`);
   const reader = resp.body.getReader();
@@ -62,7 +71,7 @@ export async function streamSSE(
       const payload = line.slice(5).trim();
       if (payload === "[DONE]") return full;
       try {
-        const obj = JSON.parse(payload);
+        const obj = JSON.parse(payload) as StreamChunk;
         if (typeof obj.content === "string") full += obj.content;
         onChunk(obj);
       } catch {
@@ -104,13 +113,11 @@ export const chatApi = {
   listMessages: (convId: string) => req<Message[]>(`/api/chat/messages?conversation_id=${convId}`),
 };
 
-export async function uploadDocument(notebookId: string, file: File): Promise<{ document_id: string; status: string }> {
+export function uploadDocument(notebookId: string, file: File): Promise<{ document_id: string; status: string }> {
   const fd = new FormData();
   fd.append("notebook_id", notebookId);
   fd.append("file", file);
-  const resp = await fetch("/api/ingest/upload", { method: "POST", body: fd });
-  if (!resp.ok) throw new Error(await resp.text());
-  return resp.json();
+  return req<{ document_id: string; status: string }>("/api/ingest/upload", { method: "POST", body: fd });
 }
 
 export type Card = {

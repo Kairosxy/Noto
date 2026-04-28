@@ -45,13 +45,9 @@ class GoogleProvider(AIProvider):
             if chunk.text:
                 yield chunk.text
 
-    async def test_connection(self) -> dict:
-        try:
-            client = self._get_client()
-            await client.aio.models.generate_content(
-                model=self.model,
-                contents="Hi",
-            )
-            return {"success": True, "message": f"连接成功 (模型: {self.model})"}
-        except Exception as e:
-            return {"success": False, "message": f"连接失败: {e}"}
+    async def _ping(self) -> str:
+        await self._get_client().aio.models.generate_content(
+            model=self.model,
+            contents="Hi",
+        )
+        return self.model

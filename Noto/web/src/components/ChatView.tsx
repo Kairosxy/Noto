@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { chatApi, chatApiExt, Message, streamSSE } from "../api/client";
 import CitationPanel from "./CitationPanel";
 
@@ -9,11 +9,14 @@ export default function ChatView({ notebookId }: { notebookId: string }) {
   const [input, setInput] = useState("");
   const [citations, setCitations] = useState<{ chunk_id: string; page_num: number | null }[]>([]);
   const [busy, setBusy] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!convId) return;
     chatApi.listMessages(convId).then(setMessages);
   }, [convId]);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const onSend = async (e: FormEvent) => {
     e.preventDefault();
@@ -23,7 +26,6 @@ export default function ChatView({ notebookId }: { notebookId: string }) {
     setBusy(true);
     setStreaming("");
 
-    // 乐观追加用户消息
     setMessages((m) => [...m, {
       id: "tmp-" + Date.now(),
       conversation_id: convId ?? "",
@@ -33,25 +35,32 @@ export default function ChatView({ notebookId }: { notebookId: string }) {
       created_at: new Date().toISOString(),
     }]);
 
-    let newConvId = convId;
-    await streamSSE(
-      "/api/chat/send",
-      { notebook_id: notebookId, conversation_id: convId, message: userMsg },
-      (d) => {
-        if ((d as any).conversation_id && !convId) {
-          newConvId = (d as any).conversation_id;
-          setConvId(newConvId);
-        }
-        if ((d as any).citations) setCitations((d as any).citations);
-        if (d.content) setStreaming((s) => s + d.content);
-        if (d.error) setStreaming((s) => s + `\n[ERROR] ${d.error}`);
-      },
-    );
-
-    // 完成后重新拉消息
-    if (newConvId) setMessages(await chatApi.listMessages(newConvId));
-    setStreaming("");
-    setBusy(false);
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    let effectiveConvId = convId;
+    try {
+      await streamSSE(
+        "/api/chat/send",
+        { notebook_id: notebookId, conversation_id: convId, message: userMsg },
+        (d) => {
+          if (d.conversation_id && !effectiveConvId) {
+            effectiveConvId = d.conversation_id;
+            setConvId(d.conversation_id);
+          }
+          if (d.citations) setCitations(d.citations);
+          if (d.content) setStreaming((s) => s + d.content);
+          if (d.error) setStreaming((s) => s + `\n[ERROR] ${d.error}`);
+        },
+        ctrl.signal,
+      );
+      if (effectiveConvId) setMessages(await chatApi.listMessages(effectiveConvId));
+    } catch (err) {
+      if ((err as { name?: string }).name !== "AbortError") throw err;
+    } finally {
+      abortRef.current = null;
+      setStreaming("");
+      setBusy(false);
+    }
   };
 
   const onClose = async () => {

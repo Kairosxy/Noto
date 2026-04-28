@@ -97,10 +97,8 @@ def chunk(doc: ParsedDoc, target_tokens: int = 800) -> list[Chunk]:
         cursor = para_start + len(para)
 
         if _estimate_tokens(para) > target_tokens:
-            # 先排空缓冲
             emit()
-            # 超长段落按字硬切
-            step = int(target_tokens * 0.7)  # 按 char 近似
+            step = int(target_tokens * 0.7)
             for i in range(0, len(para), step):
                 seg = para[i:i + step]
                 page = _page_for_offset(para_start + i, doc.page_map)

@@ -1,15 +1,13 @@
 """阶段评估报告"""
 
 import json
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 
 from models.schemas import ReportGenerateRequest
+from services.prompts import render_prompt
 
 router = APIRouter(prefix="/api/report", tags=["report"])
-
-_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "report.md"
 
 
 @router.post("/generate")
@@ -23,11 +21,22 @@ async def generate(req: ReportGenerateRequest, request: Request):
     to_iso = f"{req.to_date.isoformat()}T23:59:59Z"
 
     convs = supa.table("conversations").select("id,title,started_at").eq("notebook_id", req.notebook_id).gte("started_at", from_iso).lte("started_at", to_iso).execute()
-    conv_summaries = []
-    for c in convs.data or []:
-        msgs = supa.table("messages").select("role,content").eq("conversation_id", c["id"]).order("created_at").execute()
-        trimmed = [{"role": m["role"], "content": m["content"][:80]} for m in (msgs.data or [])[:10]]
-        conv_summaries.append({"title": c["title"], "messages": trimmed})
+    conv_list = convs.data or []
+    conv_ids = [c["id"] for c in conv_list]
+
+    by_conv: dict[str, list[dict]] = {}
+    if conv_ids:
+        msgs = supa.table("messages").select("conversation_id,role,content").in_("conversation_id", conv_ids).order("created_at").execute()
+        for m in msgs.data or []:
+            by_conv.setdefault(m["conversation_id"], []).append(m)
+
+    conv_summaries = [
+        {
+            "title": c["title"],
+            "messages": [{"role": m["role"], "content": m["content"][:80]} for m in by_conv.get(c["id"], [])[:10]],
+        }
+        for c in conv_list
+    ]
 
     cards = supa.table("cards").select("question,answer,ease,reps").eq("notebook_id", req.notebook_id).order("created_at", desc=True).limit(20).execute()
 
@@ -43,11 +52,11 @@ async def generate(req: ReportGenerateRequest, request: Request):
         "top_cards": cards.data or [],
     }, ensure_ascii=False, indent=2)
 
-    prompt = (
-        _PROMPT_PATH.read_text(encoding="utf-8")
-        .replace("{from_date}", req.from_date.isoformat())
-        .replace("{to_date}", req.to_date.isoformat())
-        .replace("{data}", data_payload)
+    prompt = render_prompt(
+        "report",
+        from_date=req.from_date.isoformat(),
+        to_date=req.to_date.isoformat(),
+        data=data_payload,
     )
 
     markdown = await mgr.chat([{"role": "user", "content": prompt}])

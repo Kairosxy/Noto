@@ -25,14 +25,12 @@ async def upload(
     supa = request.app.state.supabase.client
     cfg = request.app.state.config
 
-    # 1. 上传到 Storage
     content = await file.read()
     doc_id = str(uuid.uuid4())
     ext = Path(file.filename or "").suffix.lower()
     path = f"{notebook_id}/{doc_id}{ext}"
     supa.storage.from_("documents").upload(path, content, {"content-type": file.content_type or "application/octet-stream"})
 
-    # 2. 插入 documents 行（status=parsing）
     supa.table("documents").insert({
         "id": doc_id,
         "notebook_id": notebook_id,
@@ -42,13 +40,12 @@ async def upload(
         "status": "parsing",
     }).execute()
 
-    # 3. 后台任务：解析 + 分块 + 嵌入
     background.add_task(_process_document, cfg, supa, doc_id, content, ext or ".txt")
 
     return {"document_id": doc_id, "status": "parsing"}
 
 
-def _process_document(cfg, supa, doc_id: str, content: bytes, ext: str):
+async def _process_document(cfg, supa, doc_id: str, content: bytes, ext: str):
     try:
         with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
             tmp.write(content)
@@ -61,15 +58,13 @@ def _process_document(cfg, supa, doc_id: str, content: bytes, ext: str):
         if not eff["model"]:
             raise RuntimeError("embedding model 未配置")
 
-        import asyncio
-        texts = [c.content for c in chunks]
-        vectors = asyncio.run(embed(
-            texts=texts,
+        vectors = await embed(
+            texts=[c.content for c in chunks],
             provider=eff["provider"],
             api_key=eff["api_key"],
             base_url=eff["base_url"],
             model=eff["model"],
-        ))
+        )
 
         rows = [
             {
@@ -89,7 +84,7 @@ def _process_document(cfg, supa, doc_id: str, content: bytes, ext: str):
             "status": "ready",
         }).eq("id", doc_id).execute()
 
-    except Exception as e:
+    except Exception:
         log.exception("文档解析失败 doc_id=%s", doc_id)
         supa.table("documents").update({"status": "failed"}).eq("id", doc_id).execute()
 

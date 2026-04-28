@@ -47,15 +47,10 @@ class OpenAIProvider(AIProvider):
             if delta.content:
                 yield delta.content
 
-    async def test_connection(self) -> dict:
-        try:
-            client = self._get_client()
-            resp = await client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": "Hi"}],
-                max_tokens=5,
-            )
-            used = resp.model or self.model
-            return {"success": True, "message": f"连接成功 (模型: {used})"}
-        except Exception as e:
-            return {"success": False, "message": f"连接失败: {e}"}
+    async def _ping(self) -> str:
+        resp = await self._get_client().chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": "Hi"}],
+            max_tokens=5,
+        )
+        return resp.model or self.model

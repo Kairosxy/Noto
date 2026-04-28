@@ -17,6 +17,13 @@ class AIProvider(ABC):
     async def chat_stream(self, messages: list[dict], system: str = "") -> AsyncIterator[str]: ...
 
     @abstractmethod
-    async def test_connection(self) -> dict:
-        """{success: bool, message: str}"""
+    async def _ping(self) -> str:
+        """发一个最小请求，返回服务端报告的模型名（或 self.model 作为回退）。"""
         ...
+
+    async def test_connection(self) -> dict:
+        try:
+            used = await self._ping()
+            return {"success": True, "message": f"连接成功 (模型: {used})"}
+        except Exception as e:
+            return {"success": False, "message": f"连接失败: {e}"}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Document, Notebook, notebooksApi } from "../api/client";
 import ChatView from "../components/ChatView";
@@ -12,6 +12,8 @@ export default function NotebookDetail() {
   const [nb, setNb] = useState<Notebook | null>(null);
   const [docs, setDocs] = useState<Document[]>([]);
   const [tab, setTab] = useState<Tab>("docs");
+  const docsRef = useRef<Document[]>([]);
+  docsRef.current = docs;
 
   const reload = async () => {
     if (!id) return;
@@ -19,13 +21,13 @@ export default function NotebookDetail() {
     setDocs(await notebooksApi.listDocuments(id));
   };
 
-  useEffect(() => { reload(); }, [id]);
   useEffect(() => {
+    reload();
     const t = setInterval(() => {
-      if (docs.some((d) => d.status === "parsing")) reload();
+      if (docsRef.current.some((d) => d.status === "parsing")) reload();
     }, 3000);
     return () => clearInterval(t);
-  }, [docs]);
+  }, [id]);
 
   if (!id || !nb) return <div>加载中...</div>;
 

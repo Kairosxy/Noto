@@ -17,19 +17,22 @@ class AIChatRequest(BaseModel):
     system: str = ""
 
 
+ProviderName = Literal["openai", "anthropic", "google"]
+
+
 class TestConnectionRequest(BaseModel):
-    provider: Literal["openai", "anthropic", "google"]
+    provider: ProviderName
     api_key: str
     base_url: str = ""
     model: str = ""
 
 
 class SettingsUpdateRequest(BaseModel):
-    ai_provider: Optional[str] = None
+    ai_provider: Optional[ProviderName] = None
     ai_api_key: Optional[str] = None
     ai_base_url: Optional[str] = None
     ai_model: Optional[str] = None
-    embedding_provider: Optional[str] = None
+    embedding_provider: Optional[ProviderName] = None
     embedding_api_key: Optional[str] = None
     embedding_base_url: Optional[str] = None
     embedding_model: Optional[str] = None

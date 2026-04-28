@@ -1,9 +1,7 @@
 """学习对话：RAG + Socratic prompt + SSE"""
 
-import json
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -11,17 +9,12 @@ from fastapi.responses import StreamingResponse
 from models.schemas import ChatSendRequest, CloseConversationRequest
 from services.ai.embedding import embed
 from services.ai.utils import SSE_DONE, SSE_HEADERS, extract_json, sse_event
+from services.prompts import render_prompt
 from services.retrieval import search
 
 log = logging.getLogger("noto.chat")
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
-
-_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "socratic.md"
-
-
-def _load_socratic_prompt() -> str:
-    return _PROMPT_PATH.read_text(encoding="utf-8")
 
 
 @router.post("/send")
@@ -33,7 +26,6 @@ async def send(req: ChatSendRequest, request: Request):
     if not mgr.is_configured:
         raise HTTPException(400, "AI 未配置")
 
-    # 1. 获取或创建 conversation
     conv_id = req.conversation_id
     if not conv_id:
         r = supa.table("conversations").insert({
@@ -43,11 +35,9 @@ async def send(req: ChatSendRequest, request: Request):
         }).execute()
         conv_id = r.data[0]["id"]
 
-    # 2. 载入 notebook 信息（拿 goal）
     nb = supa.table("notebooks").select("goal").eq("id", req.notebook_id).single().execute()
     goal = nb.data.get("goal", "") if nb.data else ""
 
-    # 3. 检索相关 chunks
     eff = cfg.effective_embedding()
     query_vecs = await embed(
         texts=[req.message],
@@ -62,14 +52,17 @@ async def send(req: ChatSendRequest, request: Request):
         f"[片段 {i+1}, p.{c['page_num']}]\n{c['content']}" for i, c in enumerate(chunks)
     ) or "（暂无资料，只能走开放式引导）"
 
-    system = _load_socratic_prompt().replace("{citations}", citation_text).replace("{goal}", goal or "（未设定）")
+    system = render_prompt("socratic", citations=citation_text, goal=goal or "（未设定）")
 
-    # 4. 载入历史（最近 10 条）
-    hist = supa.table("messages").select("role,content").eq("conversation_id", conv_id).order("created_at").execute()
-    history = [{"role": m["role"], "content": m["content"]} for m in (hist.data or [])[-10:]]
+    hist = (
+        supa.table("messages").select("role,content")
+        .eq("conversation_id", conv_id)
+        .order("created_at", desc=True).limit(10)
+        .execute()
+    )
+    history = [{"role": m["role"], "content": m["content"]} for m in reversed(hist.data or [])]
     history.append({"role": "user", "content": req.message})
 
-    # 5. 插入用户消息
     supa.table("messages").insert({
         "conversation_id": conv_id,
         "role": "user",
@@ -77,13 +70,11 @@ async def send(req: ChatSendRequest, request: Request):
         "citations": None,
     }).execute()
 
-    # 6. 流式返回 + 结束时写入 assistant 消息
     citations_payload = [{"chunk_id": c["id"], "page_num": c["page_num"]} for c in chunks]
 
     async def event_stream():
         full = ""
         try:
-            # 首帧先把 conv_id + citations 发给前端
             yield sse_event({"conversation_id": conv_id, "citations": citations_payload})
             async for chunk_text in mgr.chat_stream(history, system):
                 full += chunk_text
@@ -116,9 +107,6 @@ async def list_conversations(notebook_id: str, request: Request):
     return r.data or []
 
 
-_CARD_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "card_extraction.md"
-
-
 @router.post("/close-conversation")
 async def close_conversation(req: CloseConversationRequest, request: Request):
     supa = request.app.state.supabase.client
@@ -133,7 +121,7 @@ async def close_conversation(req: CloseConversationRequest, request: Request):
     msgs = supa.table("messages").select("role,content").eq("conversation_id", req.conversation_id).order("created_at").execute()
     transcript = "\n\n".join(f"{m['role']}: {m['content']}" for m in (msgs.data or []))
 
-    prompt = _CARD_PROMPT_PATH.read_text(encoding="utf-8").replace("{transcript}", transcript)
+    prompt = render_prompt("card_extraction", transcript=transcript)
     raw = await mgr.chat([{"role": "user", "content": prompt}])
     parsed = extract_json(raw)
     if not isinstance(parsed, list):

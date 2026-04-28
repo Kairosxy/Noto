@@ -37,14 +37,10 @@ class AnthropicProvider(AIProvider):
             async for text in stream.text_stream:
                 yield text
 
-    async def test_connection(self) -> dict:
-        try:
-            client = self._get_client()
-            resp = await client.messages.create(
-                model=self.model,
-                max_tokens=5,
-                messages=[{"role": "user", "content": "Hi"}],
-            )
-            return {"success": True, "message": f"连接成功 (模型: {resp.model})"}
-        except Exception as e:
-            return {"success": False, "message": f"连接失败: {e}"}
+    async def _ping(self) -> str:
+        resp = await self._get_client().messages.create(
+            model=self.model,
+            max_tokens=5,
+            messages=[{"role": "user", "content": "Hi"}],
+        )
+        return resp.model or self.model
