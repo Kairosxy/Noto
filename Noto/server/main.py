@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import load_config
-from routers import ai as ai_router, ingest as ingest_router, notebooks as nb_router, chat as chat_router, review as review_router
+from routers import ai as ai_router, ingest as ingest_router, notebooks as nb_router, chat as chat_router, review as review_router, report as report_router
 from services.ai.manager import AIProviderManager
 from services.supabase_client import SupabaseClient
 
@@ -41,6 +41,7 @@ def create_app() -> FastAPI:
     app.include_router(nb_router.router)
     app.include_router(chat_router.router)
     app.include_router(review_router.router)
+    app.include_router(report_router.router)
     return app
 
 
