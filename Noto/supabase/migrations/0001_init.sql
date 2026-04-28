@@ -82,3 +82,25 @@ create table if not exists reports (
 -- Storage bucket
 insert into storage.buckets (id, name, public) values ('documents', 'documents', false)
 on conflict (id) do nothing;
+
+create or replace function match_chunks(
+  p_notebook_id uuid,
+  p_query vector(1024),
+  p_k int default 5
+) returns table (
+  id uuid,
+  document_id uuid,
+  content text,
+  page_num int,
+  distance float
+) language sql stable as $$
+  select c.id, c.document_id, c.content, c.page_num,
+         (c.embedding <=> p_query) as distance
+  from chunks c
+  join documents d on d.id = c.document_id
+  where d.notebook_id = p_notebook_id
+    and d.status = 'ready'
+    and c.embedding is not null
+  order by c.embedding <=> p_query
+  limit p_k;
+$$;
