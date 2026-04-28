@@ -3,6 +3,7 @@ import { ConfigProvider } from "./store/config";
 import ConfigPage from "./pages/ConfigPage";
 import NotebooksPage from "./pages/NotebooksPage";
 import NotebookDetail from "./pages/NotebookDetail";
+import ReviewSession from "./pages/ReviewSession";
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<NotebooksPage />} />
           <Route path="/notebooks/:id" element={<NotebookDetail />} />
+          <Route path="/notebooks/:id/review" element={<ReviewSession />} />
           <Route path="/config" element={<ConfigPage />} />
         </Routes>
       </div>

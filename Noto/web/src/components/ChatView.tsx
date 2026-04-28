@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { chatApi, Message, streamSSE } from "../api/client";
+import { chatApi, chatApiExt, Message, streamSSE } from "../api/client";
 import CitationPanel from "./CitationPanel";
 
 export default function ChatView({ notebookId }: { notebookId: string }) {
@@ -54,6 +54,16 @@ export default function ChatView({ notebookId }: { notebookId: string }) {
     setBusy(false);
   };
 
+  const onClose = async () => {
+    if (!convId) return;
+    if (!confirm("结束本轮并提炼复习卡？")) return;
+    const r = await chatApiExt.close(convId);
+    alert(`已生成 ${r.cards.length} 张复习卡`);
+    setConvId(null);
+    setMessages([]);
+    setCitations([]);
+  };
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
       <div>
@@ -76,6 +86,9 @@ export default function ChatView({ notebookId }: { notebookId: string }) {
           <input value={input} disabled={busy} onChange={(e) => setInput(e.target.value)} placeholder="说说你的理解..." />
           <button className="primary" type="submit" disabled={busy} style={{ marginTop: 8 }}>
             {busy ? "回答中..." : "发送"}
+          </button>
+          <button type="button" onClick={onClose} disabled={!convId || busy} style={{ marginLeft: 8 }}>
+            结束本轮
           </button>
         </form>
       </div>
