@@ -105,3 +105,100 @@ class ReportOut(BaseModel):
     to_date: date
     content: str
     generated_at: datetime
+
+
+# -------------------- v2 additions --------------------
+
+from uuid import UUID
+
+# Skeleton
+class SkeletonNodeOut(BaseModel):
+    id: UUID
+    node_type: Literal["claim", "concept", "question", "pitfall"]
+    title: str
+    body: str | None
+    source_positions: list[dict] | None
+    card_source: str
+    rejected_at: datetime | None
+    merged_into: UUID | None
+
+
+class LearningDirectionOut(BaseModel):
+    id: UUID
+    position: int
+    title: str
+    description: str | None
+    estimated_minutes: int | None
+    node_ids: list[UUID]
+
+
+class SkeletonOut(BaseModel):
+    id: UUID
+    notebook_id: UUID
+    space_summary: str | None
+    status: str
+    directions: list[LearningDirectionOut]
+    nodes: list[SkeletonNodeOut]
+    generated_at: datetime
+
+
+class RegenerateSkeletonRequest(BaseModel):
+    force: bool = False
+
+
+# Document
+class DocumentSummary(BaseModel):
+    document_id: UUID
+    summary: str | None
+
+
+# Card state + evaluation
+class CardStateUpdate(BaseModel):
+    state: Literal["unread", "thinking", "got_it", "stuck"]
+    user_explanation: str | None = None
+
+
+class EvaluateExplanationRequest(BaseModel):
+    card_id: UUID
+    user_explanation: str
+
+
+class EvaluateExplanationResponse(BaseModel):
+    verdict: Literal["pass", "can_deepen"]
+    feedback: str
+    missing_points: list[str]
+
+
+# Highlights
+class HighlightCreate(BaseModel):
+    document_id: UUID
+    chunk_id: UUID | None = None
+    text: str
+
+
+class HighlightOut(BaseModel):
+    id: UUID
+    document_id: UUID
+    notebook_id: UUID
+    chunk_id: UUID | None
+    text: str
+    created_at: datetime
+
+
+# Selection-scoped ask
+class AskWithContextRequest(BaseModel):
+    notebook_id: UUID
+    document_id: UUID
+    chunk_id: UUID | None
+    selected_text: str
+    user_question: str
+    action: Literal["ask", "mark_stuck", "save_note"] = "ask"
+
+
+# Reject / merge
+class RejectNodeRequest(BaseModel):
+    reason: str = ""
+
+
+class MergeNodeRequest(BaseModel):
+    target_node_id: UUID
