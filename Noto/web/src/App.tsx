@@ -4,6 +4,7 @@ import { ConfigProvider } from "./store/config";
 import ConfigPage from "./pages/ConfigPage";
 import SpaceHomePage from "./pages/SpaceHomePage";
 import DocReadingPage from "./pages/DocReadingPage";
+import DirectionPage from "./pages/DirectionPage";
 import { Notebook, notebooksApi } from "./api/client";
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/space/:id" element={<SpaceHomePage />} />
           <Route path="/doc/:id" element={<DocReadingPage />} />
+          <Route path="/direction/:directionId" element={<DirectionPage />} />
           <Route path="/config" element={<ConfigPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
