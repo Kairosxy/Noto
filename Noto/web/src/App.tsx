@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes, Navigate, useNavigate, Link } from "react
 import { ConfigProvider } from "./store/config";
 import ConfigPage from "./pages/ConfigPage";
 import SpaceHomePage from "./pages/SpaceHomePage";
+import DocReadingPage from "./pages/DocReadingPage";
 import { Notebook, notebooksApi } from "./api/client";
 
 export default function App() {
@@ -12,6 +13,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/space/:id" element={<SpaceHomePage />} />
+          <Route path="/doc/:id" element={<DocReadingPage />} />
           <Route path="/config" element={<ConfigPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
