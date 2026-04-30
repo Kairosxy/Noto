@@ -1,12 +1,13 @@
 """学习对话：RAG + Socratic prompt + SSE"""
 
 import logging
+import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from models.schemas import ChatSendRequest, CloseConversationRequest
+from models.schemas import AskWithContextRequest, ChatSendRequest, CloseConversationRequest
 from services.ai.embedding import embed
 from services.ai.utils import SSE_DONE, SSE_HEADERS, extract_json, sse_event
 from services.prompts import render_prompt
@@ -146,3 +147,53 @@ async def close_conversation(req: CloseConversationRequest, request: Request):
     }).eq("id", req.conversation_id).execute()
 
     return {"ok": True, "cards": rows}
+
+
+@router.post("/ask-with-context")
+async def ask_with_context(req: AskWithContextRequest, request: Request):
+    """
+    User selected text in a document and asks AI about it.
+    Creates a skeleton_node of type `user_selection` + card, then streams AI response.
+    """
+    supa = request.app.state.supabase.client
+    mgr = request.app.state.ai_manager
+    if not mgr.is_configured:
+        raise HTTPException(400, "AI 未配置")
+
+    # Ensure skeleton exists (user_selection nodes still attach to the space skeleton)
+    sk = supa.table("skeletons").select("id").eq("notebook_id", str(req.notebook_id)).maybe_single().execute()
+    if not sk.data:
+        sk_new = supa.table("skeletons").insert({"notebook_id": str(req.notebook_id), "status": "ready"}).execute()
+        skeleton_id = sk_new.data[0]["id"]
+    else:
+        skeleton_id = sk.data["id"]
+
+    # Node type maps from action
+    node_type_map = {"ask": "question", "mark_stuck": "question", "save_note": "claim"}
+    initial_state_map = {"ask": "thinking", "mark_stuck": "stuck", "save_note": "thinking"}
+
+    node_id = str(uuid.uuid4())
+    supa.table("skeleton_nodes").insert({
+        "id": node_id,
+        "skeleton_id": skeleton_id,
+        "notebook_id": str(req.notebook_id),
+        "node_type": node_type_map.get(req.action, "question"),
+        "title": req.user_question or req.selected_text[:50],
+        "body": req.selected_text,
+        "source_positions": [{"document_id": str(req.document_id), "chunk_id": str(req.chunk_id) if req.chunk_id else None}],
+        "card_source": "user_selection",
+    }).execute()
+
+    # Create matching card in initial state
+    card_r = supa.table("cards").insert({
+        "notebook_id": str(req.notebook_id),
+        "skeleton_node_id": node_id,
+        "question": req.user_question or req.selected_text[:50],
+        "answer": "",
+        "card_state": initial_state_map.get(req.action, "thinking"),
+    }).execute()
+
+    return {
+        "node_id": node_id,
+        "card_id": card_r.data[0]["id"] if card_r.data else None,
+    }
