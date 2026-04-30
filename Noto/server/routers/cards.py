@@ -77,7 +77,7 @@ async def evaluate(card_id: str, req: EvaluateExplanationRequest, request: Reque
 @router.get("")
 async def list_cards(notebook_id: str, request: Request, state: str | None = None):
     supa = request.app.state.supabase.client
-    q = supa.table("cards").select("*").eq("notebook_id", notebook_id).order("created_at", desc=True)
+    q = supa.table("cards").select("*").eq("notebook_id", notebook_id).order("due_at", desc=True)
     if state:
         q = q.eq("card_state", state)
     return q.execute().data or []
