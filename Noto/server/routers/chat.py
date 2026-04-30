@@ -152,15 +152,28 @@ async def close_conversation(req: CloseConversationRequest, request: Request):
 @router.post("/ask-with-context")
 async def ask_with_context(req: AskWithContextRequest, request: Request):
     """
-    User selected text in a document and asks AI about it.
-    Creates a skeleton_node of type `user_selection` + card, then streams AI response.
+    User selected text + acts on it. Three actions:
+    - ask: AI replies with explanation, NO card created (pure conversation)
+    - mark_stuck: creates stuck card (I don't understand this passage)
+    - save_note: creates thinking card (I want to remember this, explain later)
     """
     supa = request.app.state.supabase.client
     mgr = request.app.state.ai_manager
     if not mgr.is_configured:
         raise HTTPException(400, "AI 未配置")
 
-    # Ensure skeleton exists (user_selection nodes still attach to the space skeleton)
+    # For 'ask' — just get an AI answer about the selected passage, no card
+    if req.action == "ask":
+        prompt = (
+            f"用户在阅读中选中了一段原文：\n\n"
+            f"「{req.selected_text}」\n\n"
+            f"用户的问题：{req.user_question or '请解释这段'}\n\n"
+            f"请简短、清晰地回答（≤ 200 字）。引用原文时可以直接用引号。"
+        )
+        reply = await mgr.chat([{"role": "user", "content": prompt}])
+        return {"reply": reply, "node_id": None, "card_id": None}
+
+    # For mark_stuck / save_note — create card
     sk = supa.table("skeletons").select("id").eq("notebook_id", str(req.notebook_id)).maybe_single().execute()
     if sk is None or not sk.data:
         sk_new = supa.table("skeletons").insert({"notebook_id": str(req.notebook_id), "status": "ready"}).execute()
@@ -168,32 +181,31 @@ async def ask_with_context(req: AskWithContextRequest, request: Request):
     else:
         skeleton_id = sk.data["id"]
 
-    # Node type maps from action
-    node_type_map = {"ask": "question", "mark_stuck": "question", "save_note": "claim"}
-    initial_state_map = {"ask": "thinking", "mark_stuck": "stuck", "save_note": "thinking"}
+    node_type_map = {"mark_stuck": "question", "save_note": "claim"}
+    initial_state_map = {"mark_stuck": "stuck", "save_note": "thinking"}
 
     node_id = str(uuid.uuid4())
     supa.table("skeleton_nodes").insert({
         "id": node_id,
         "skeleton_id": skeleton_id,
         "notebook_id": str(req.notebook_id),
-        "node_type": node_type_map.get(req.action, "question"),
+        "node_type": node_type_map[req.action],
         "title": req.user_question or req.selected_text[:50],
         "body": req.selected_text,
         "source_positions": [{"document_id": str(req.document_id), "chunk_id": str(req.chunk_id) if req.chunk_id else None}],
         "card_source": "user_selection",
     }).execute()
 
-    # Create matching card in initial state
     card_r = supa.table("cards").insert({
         "notebook_id": str(req.notebook_id),
         "skeleton_node_id": node_id,
         "question": req.user_question or req.selected_text[:50],
         "answer": "",
-        "card_state": initial_state_map.get(req.action, "thinking"),
+        "card_state": initial_state_map[req.action],
     }).execute()
 
     return {
+        "reply": None,
         "node_id": node_id,
         "card_id": card_r.data[0]["id"] if card_r.data else None,
     }

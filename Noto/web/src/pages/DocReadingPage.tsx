@@ -57,19 +57,34 @@ export default function DocReadingPage() {
     }
   };
 
+  const [askReply, setAskReply] = useState<string | null>(null);
+  const [askLoading, setAskLoading] = useState(false);
+
   const doAction = async (action: "ask" | "mark_stuck" | "save_note") => {
     if (!doc || !notebook) return;
     const q = action === "ask" ? (prompt("你要问什么？") || "") : "";
+    if (action === "ask" && !q.trim()) { setSelPos(null); return; }
+
+    if (action === "ask") {
+      setAskLoading(true); setAskReply(null); setSelPos(null);
+      try {
+        const r = await askWithContext({
+          notebook_id: notebook.id, document_id: doc.id,
+          chunk_id: selChunkId || undefined, selected_text: selText,
+          user_question: q, action,
+        });
+        setAskReply(r.reply || "（AI 没有返回内容）");
+      } finally { setAskLoading(false); }
+      return;
+    }
+
     await askWithContext({
-      notebook_id: notebook.id,
-      document_id: doc.id,
-      chunk_id: selChunkId || undefined,
-      selected_text: selText,
-      user_question: q,
-      action,
+      notebook_id: notebook.id, document_id: doc.id,
+      chunk_id: selChunkId || undefined, selected_text: selText,
+      user_question: q, action,
     });
     setSelPos(null); window.getSelection()?.removeAllRanges();
-    alert(action === "ask" ? "已为选中段创建问题卡" : action === "mark_stuck" ? "已标为不懂" : "已保存笔记");
+    alert(action === "mark_stuck" ? "已标为不懂 · 已加入知识点列表" : "已保存笔记 · 已加入知识点列表");
   };
 
   const onHighlight = async () => {
@@ -130,6 +145,35 @@ export default function DocReadingPage() {
             onHighlight={onHighlight}
             onSaveNote={() => doAction("save_note")}
           />
+
+          {(askReply !== null || askLoading) && (
+            <div style={{
+              position: "fixed", bottom: 20, right: 320, width: 380,
+              background: "var(--surface)", border: "1px solid var(--border)",
+              borderLeft: "3px solid var(--accent)", borderRadius: 10,
+              padding: "14px 16px", boxShadow: "var(--shadow-lg)", zIndex: 60,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ fontSize: 10, color: "var(--text-faint)", letterSpacing: "0.09em", textTransform: "uppercase" }}>🎯 AI 回答</span>
+                <button onClick={() => setAskReply(null)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-muted)" }}>×</button>
+              </div>
+              <div style={{ fontFamily: "var(--font-serif)", fontSize: 13, lineHeight: 1.75, maxHeight: 280, overflowY: "auto" }}>
+                {askLoading ? "思考中…" : askReply}
+              </div>
+              {askReply && !askLoading && (
+                <div style={{ marginTop: 10, display: "flex", gap: 6 }}>
+                  <button onClick={() => doAction("save_note")} style={{
+                    border: "1px solid var(--border)", background: "var(--surface-warm)",
+                    borderRadius: 6, padding: "4px 10px", fontSize: 11, cursor: "pointer",
+                  }}>📝 保存为笔记</button>
+                  <button onClick={() => setAskReply(null)} style={{
+                    background: "transparent", border: "none", color: "var(--text-muted)",
+                    padding: "4px 10px", fontSize: 11, cursor: "pointer",
+                  }}>关闭</button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       }
     />

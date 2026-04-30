@@ -42,7 +42,18 @@ export default function SkeletonCard({ node, notebookId }: { node: SkeletonNode;
               notebookId={notebookId}
               card={card}
               onCardUpdate={setCard}
-              onMarkGotIt={() => setShowGotIt(true)}
+              onMarkGotIt={async () => {
+                if (!card) {
+                  const created = await cardsApi.ensureForNode(node.id);
+                  setCard(created);
+                }
+                setShowGotIt(true);
+              }}
+              onMarkStuck={async () => {
+                const c = card || await cardsApi.ensureForNode(node.id);
+                await cardsApi.updateState(c.id, { state: "stuck" });
+                setCard({ ...c, card_state: "stuck" });
+              }}
               onReject={async () => {
                 if (confirm("否决这张卡？")) {
                   await skeletonApi.rejectNode(node.id, "用户否决");

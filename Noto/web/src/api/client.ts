@@ -124,6 +124,8 @@ export const docsApi = {
 export const cardsApi = {
   list: (notebookId: string, state?: string) =>
     req<Card[]>(`/api/cards?notebook_id=${notebookId}${state ? `&state=${state}` : ""}`),
+  ensureForNode: (nodeId: string) =>
+    req<Card>(`/api/cards/ensure-for-node/${nodeId}`, { method: "POST" }),
   updateState: (cardId: string, body: { state: Card["card_state"]; user_explanation?: string }) =>
     req<Card>(`/api/cards/${cardId}/state`, { method: "PATCH", body: JSON.stringify(body) }),
   evaluate: (cardId: string, user_explanation: string) =>
@@ -198,7 +200,8 @@ export async function askWithContext(body: {
   selected_text: string; user_question: string;
   action: "ask" | "mark_stuck" | "save_note";
 }) {
-  return req<{ node_id: string; card_id: string | null }>("/api/chat/ask-with-context", {
-    method: "POST", body: JSON.stringify(body),
-  });
+  return req<{ reply: string | null; node_id: string | null; card_id: string | null }>(
+    "/api/chat/ask-with-context",
+    { method: "POST", body: JSON.stringify(body) },
+  );
 }

@@ -2,13 +2,14 @@ import { useState } from "react";
 import { Card, SkeletonNode, streamSSE } from "../api/client";
 
 export default function SocraticThread({
-  node, notebookId, card, onCardUpdate, onMarkGotIt, onReject, onCollapse,
+  node, notebookId, card, onCardUpdate, onMarkGotIt, onMarkStuck, onReject, onCollapse,
 }: {
   node: SkeletonNode;
   notebookId: string;
   card: Card | null;
   onCardUpdate: (c: Card) => void;
   onMarkGotIt: () => void;
+  onMarkStuck: () => void;
   onReject: () => void;
   onCollapse: () => void;
 }) {
@@ -80,7 +81,7 @@ export default function SocraticThread({
       <div style={{ marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>
         <button onClick={send} disabled={busy} style={primaryBtn}>💬 提交</button>
         <button onClick={onMarkGotIt} style={btn}>✓ 懂了</button>
-        <button style={btn}>⚠ 不懂</button>
+        <button onClick={onMarkStuck} style={btn}>⚠ 不懂</button>
         <button onClick={onReject} style={subtleBtn}>× 否决</button>
         <button onClick={onCollapse} style={subtleBtn}>收起</button>
       </div>

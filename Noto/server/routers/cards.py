@@ -10,6 +10,30 @@ from services.evaluate import evaluate_explanation
 router = APIRouter(prefix="/api/cards", tags=["cards"])
 
 
+@router.post("/ensure-for-node/{node_id}")
+async def ensure_card_for_node(node_id: str, request: Request):
+    """Find-or-create a card for an AI-generated skeleton node. Called lazily when user
+    first commits to an action (懂了 / 不懂) on a node that has no card yet."""
+    supa = request.app.state.supabase.client
+
+    existing = supa.table("cards").select("*").eq("skeleton_node_id", node_id).limit(1).execute()
+    if existing.data:
+        return existing.data[0]
+
+    node = supa.table("skeleton_nodes").select("*").eq("id", node_id).single().execute()
+    if not node.data:
+        raise HTTPException(404, "node 不存在")
+
+    r = supa.table("cards").insert({
+        "notebook_id": node.data["notebook_id"],
+        "skeleton_node_id": node_id,
+        "question": node.data["title"],
+        "answer": node.data.get("body") or "",
+        "card_state": "unread",
+    }).execute()
+    return r.data[0]
+
+
 @router.patch("/{card_id}/state")
 async def update_state(card_id: str, req: CardStateUpdate, request: Request):
     supa = request.app.state.supabase.client
