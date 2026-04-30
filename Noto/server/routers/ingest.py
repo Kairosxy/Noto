@@ -113,7 +113,7 @@ async def _process_document(cfg, supa, doc_id: str, content: bytes, ext: str, ai
             if docs_summaries:
                 from routers.skeleton import _run_skeleton_distill
                 existing = supa.table("skeletons").select("id").eq("notebook_id", nb_id).maybe_single().execute()
-                if existing.data:
+                if existing is not None and existing.data:
                     skeleton_id = existing.data["id"]
                     supa.table("skeletons").update({"status": "generating"}).eq("id", skeleton_id).execute()
                 else:

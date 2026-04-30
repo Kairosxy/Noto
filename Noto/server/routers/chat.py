@@ -162,7 +162,7 @@ async def ask_with_context(req: AskWithContextRequest, request: Request):
 
     # Ensure skeleton exists (user_selection nodes still attach to the space skeleton)
     sk = supa.table("skeletons").select("id").eq("notebook_id", str(req.notebook_id)).maybe_single().execute()
-    if not sk.data:
+    if sk is None or not sk.data:
         sk_new = supa.table("skeletons").insert({"notebook_id": str(req.notebook_id), "status": "ready"}).execute()
         skeleton_id = sk_new.data[0]["id"]
     else:

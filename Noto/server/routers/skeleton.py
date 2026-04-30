@@ -20,7 +20,7 @@ async def get_skeleton(notebook_id: str, request: Request):
     supa = request.app.state.supabase.client
 
     sk = supa.table("skeletons").select("*").eq("notebook_id", notebook_id).maybe_single().execute()
-    if not sk.data:
+    if sk is None or not sk.data:
         return {"id": None, "status": "not_generated"}
 
     skeleton_id = sk.data["id"]
@@ -63,7 +63,7 @@ async def regenerate_skeleton(notebook_id: str, request: Request, background: Ba
 
     # Upsert skeleton row as 'generating'
     existing = supa.table("skeletons").select("id").eq("notebook_id", notebook_id).maybe_single().execute()
-    if existing.data:
+    if existing is not None and existing.data:
         skeleton_id = existing.data["id"]
         supa.table("skeletons").update({"status": "generating"}).eq("id", skeleton_id).execute()
     else:
