@@ -5,6 +5,7 @@ import ConfigPage from "./pages/ConfigPage";
 import SpaceHomePage from "./pages/SpaceHomePage";
 import DocReadingPage from "./pages/DocReadingPage";
 import DirectionPage from "./pages/DirectionPage";
+import ReviewFocus from "./pages/ReviewFocus";
 import { Notebook, notebooksApi } from "./api/client";
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
           <Route path="/space/:id" element={<SpaceHomePage />} />
           <Route path="/doc/:id" element={<DocReadingPage />} />
           <Route path="/direction/:directionId" element={<DirectionPage />} />
+          <Route path="/review" element={<ReviewFocus />} />
           <Route path="/config" element={<ConfigPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
