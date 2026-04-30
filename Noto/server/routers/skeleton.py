@@ -3,9 +3,11 @@
 import asyncio
 import logging
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
+from models.schemas import MergeNodeRequest, RejectNodeRequest
 from services.distill import distill_space_skeleton
 
 log = logging.getLogger("noto.skeleton")
@@ -127,3 +129,25 @@ def _run_skeleton_distill(mgr, supa, skeleton_id: str, notebook_id: str, goal: s
     except Exception as e:
         log.exception("skeleton distill failed")
         supa.table("skeletons").update({"status": "failed"}).eq("id", skeleton_id).execute()
+
+
+node_router = APIRouter(prefix="/api/skeleton-nodes", tags=["skeleton-nodes"])
+
+
+@node_router.post("/{node_id}/reject")
+async def reject_node(node_id: str, req: RejectNodeRequest, request: Request):
+    supa = request.app.state.supabase.client
+    supa.table("skeleton_nodes").update({
+        "rejected_at": datetime.now(timezone.utc).isoformat(),
+        "rejected_reason": req.reason,
+    }).eq("id", node_id).execute()
+    return {"ok": True}
+
+
+@node_router.post("/{node_id}/merge-into")
+async def merge_node(node_id: str, req: MergeNodeRequest, request: Request):
+    supa = request.app.state.supabase.client
+    supa.table("skeleton_nodes").update({
+        "merged_into": str(req.target_node_id),
+    }).eq("id", node_id).execute()
+    return {"ok": True}

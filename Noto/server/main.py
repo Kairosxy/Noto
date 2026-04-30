@@ -43,6 +43,7 @@ def create_app() -> FastAPI:
     app.include_router(review_router.router)
     app.include_router(report_router.router)
     app.include_router(skeleton_router.router)
+    app.include_router(skeleton_router.node_router)
     app.include_router(cards_router.router)
     app.include_router(highlights_router.router)
     return app
