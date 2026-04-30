@@ -1,11 +1,51 @@
-* { box-sizing: border-box; }
-body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: #fafafa; color: #111; }
-.container { max-width: 960px; margin: 0 auto; padding: 24px; }
-.card { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-button { cursor: pointer; padding: 6px 14px; border-radius: 6px; border: 1px solid #ccc; background: white; }
-button.primary { background: #111; color: white; border-color: #111; }
-input, textarea, select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; width: 100%; font-family: inherit; }
-label { display: block; font-size: 12px; color: #666; margin-top: 8px; margin-bottom: 2px; }
-nav { background: #111; color: white; padding: 12px 24px; }
-nav a { color: white; margin-right: 16px; text-decoration: none; }
-nav a.active { text-decoration: underline; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;500;600;700&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #faf7f2;
+  --bg-sidebar: #f4efe5;
+  --bg-drawer: #f8f3ea;
+  --surface: #ffffff;
+  --surface-warm: #fdfbf7;
+  --border: #e8ddd0;
+  --text: #2a2520;
+  --text-muted: #8a7a65;
+  --text-faint: #a89680;
+  --accent: #c96a3a;
+  --accent-bg: #fbe9d4;
+  --success: #6b8a60;
+  --success-bg: #dce8d6;
+  --highlight: #f4e4c1;
+  --danger: #c96a3a;
+  --danger-bg: #fff0e4;
+  --shadow-sm: 0 1px 2px rgba(42,37,32,0.04);
+  --shadow-md: 0 4px 12px rgba(42,37,32,0.08);
+  --shadow-lg: 0 12px 32px rgba(42,37,32,0.15);
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --font-sans: 'Inter', -apple-system, sans-serif;
+  --font-serif: 'Noto Serif SC', Georgia, serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  min-height: 100vh;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+a { color: inherit; text-decoration: none; }
