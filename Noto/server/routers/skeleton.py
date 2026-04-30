@@ -131,6 +131,37 @@ def _run_skeleton_distill(mgr, supa, skeleton_id: str, notebook_id: str, goal: s
         supa.table("skeletons").update({"status": "failed"}).eq("id", skeleton_id).execute()
 
 
+@router.post("/{notebook_id}/documents/backfill-summaries")
+async def backfill_summaries(notebook_id: str, request: Request, background: BackgroundTasks):
+    """For v1 notebooks: trigger summary generation for all documents that lack one."""
+    supa = request.app.state.supabase.client
+    mgr = request.app.state.ai_manager
+    if not mgr.is_configured:
+        raise HTTPException(400, "AI 未配置")
+
+    docs = supa.table("documents").select("id").eq("notebook_id", notebook_id).eq("status", "ready").is_("summary", None).execute()
+    count = len(docs.data or [])
+    if count == 0:
+        return {"count": 0, "status": "nothing_to_do"}
+
+    def _backfill():
+        from services.distill import distill_doc_summary
+        import asyncio as aio
+        for d in (docs.data or []):
+            chunks = supa.table("chunks").select("content").eq("document_id", d["id"]).order("position").execute()
+            if not chunks.data:
+                continue
+            full_text = "\n\n".join(c["content"] for c in chunks.data)[:60000]
+            try:
+                summary = aio.run(distill_doc_summary(mgr, full_text))
+                supa.table("documents").update({"summary": summary}).eq("id", d["id"]).execute()
+            except Exception as e:
+                log.warning("backfill failed for %s: %s", d["id"], e)
+
+    background.add_task(_backfill)
+    return {"count": count, "status": "started"}
+
+
 node_router = APIRouter(prefix="/api/skeleton-nodes", tags=["skeleton-nodes"])
 
 
